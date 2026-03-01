@@ -5,22 +5,24 @@ use byteorder::{LE, ReadBytesExt};
 use crate::Version;
 
 pub(crate) fn flag_reader<R: io::Read>(reader: &mut R,
-                                       version: super::Version) -> Result<u32, super::Error> {
+                                       version: super::Version) -> Result<(u8, u32), super::Error> {
     let bits = reader.read_u32::<LE>()?;
     #[cfg(not(feature = "wuthering-waves"))]
-    { Ok(bits) }
+    { Ok((0u8, bits)) }
     #[cfg(feature = "wuthering-waves")]
     if version == Version::V12 {
-        reader.read_u8()?;
-        Ok(
+        
+        Ok((
+            reader.read_u8()?,
             (bits >> 16) & 0x3f |
                 (bits & 0xFFFF) << 6 |
                 (bits & (1 << 28)) >> 6 |
                 (bits & 0x0FC00000) << 1 |
-                bits & 0xE0000000
-        )
+                (bits & 0xC0000000) >> 1 |
+                (bits & 0x20000000) << 2
+        ))
     } else {
-        Ok(bits)
+        Ok((0u8, bits))
     }
 }
 

@@ -61,6 +61,7 @@ pub(crate) struct Entry {
     pub blocks: Option<Vec<Block>>,
     pub flags: u8,
     pub compression_block_size: u32,
+    pub custom_entry_byte: u8
 }
 
 impl Entry {
@@ -69,9 +70,6 @@ impl Entry {
     }
     pub fn is_deleted(&self) -> bool {
         0 != (self.flags >> 1) & 1
-    }
-    pub fn is_partial_encrypted(&self) -> bool {
-        0 != (self.flags >> 3) & 1
     }
     pub fn get_serialized_size(
         version: super::Version,
@@ -153,6 +151,7 @@ impl Entry {
             blocks,
             flags,
             compression_block_size,
+            custom_entry_byte: 0u8
         })
     }
 
@@ -200,7 +199,7 @@ impl Entry {
         reader: &mut R,
         version: super::Version,
     ) -> Result<Self, super::Error> {
-        let bits = reader::flag_reader(reader, version)?;
+        let (custom_entry_byte, bits) = reader::flag_reader(reader, version)?;
 
         let compression = match (bits >> 23) & 0x3f {
             0 => None,
@@ -263,6 +262,7 @@ impl Entry {
             blocks,
             flags: encrypted as u8,
             compression_block_size,
+            custom_entry_byte
         })
     }
 
@@ -333,7 +333,7 @@ impl Entry {
         buf: &mut W,
     ) -> Result<(), super::Error> {
         reader.seek(io::SeekFrom::Start(self.offset))?;
-        let entry_read = Entry::read(reader, version)?;
+        Entry::read(reader, version)?;
         #[cfg(any(feature = "compression", feature = "oodle"))]
         let data_offset = reader.stream_position()?;
         #[allow(unused_mut)]
@@ -351,13 +351,12 @@ impl Entry {
                 };
                 use aes::cipher::BlockDecrypt;
 
-                #[cfg(not(feature = "wuthering-waves-2_4"))]
                 let data_len = data.len();
-                #[cfg(feature = "wuthering-waves-2_4")]
-                let data_len = if entry_read.is_partial_encrypted() {
-                    data.len().min(2048)
-                } else {
-                    data.len()
+                #[cfg(feature = "wuthering-waves")]
+                let data_len = match self.custom_entry_byte {
+                    1 => data.len().min(0x200000),
+                    2 => 0x800,
+                    _ => data.len(),
                 };
                 
                 for block in data[..data_len].chunks_mut(16) {
