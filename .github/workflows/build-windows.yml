@@ -1,0 +1,27 @@
+name: Build Windows exe  
+  
+on:  
+  push:  
+    branches: [ master ]  
+  pull_request:  
+  workflow_dispatch:   # 允许在 Actions 页面手动触发  
+  
+jobs:  
+  build-windows:  
+    runs-on: windows-latest  
+    steps:  
+      - uses: actions/checkout@v4  
+  
+      - name: Install Rust toolchain  
+        uses: dtolnay/rust-toolchain@stable  
+  
+      - uses: Swatinem/rust-cache@v2  
+  
+      - name: Build repak (release)  
+        run: cargo build --release -p repak_cli  
+  
+      - name: Upload exe artifact  
+        uses: actions/upload-artifact@v4  
+        with:  
+          name: repak-windows-x86_64  
+          path: target/release/repak.exe
