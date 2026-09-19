@@ -15,7 +15,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2  
   
       - name: Build repak (release)  
-        run: cargo build --release -p repak_cli  
+        run: cargo build --release -p repak_cli --features repak/wuthering-waves
   
       - name: Upload exe artifact  
         uses: actions/upload-artifact@v4  
